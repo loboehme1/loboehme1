@@ -4,8 +4,23 @@ LABEL image.author.name="yourname"
 LABEL image.author.email="yourmail"
 
 # Install dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    ca-certificates \
+    tar \
+    libtbb2 \
+    zlib1g \
+    liblzma5 \
+    libbz2-1.0 \
+    && rm -rf /var/lib/apt/lists/*
 
 # Download and install Salmon
 
+RUN curl -L https://github.com/COMBINE-lab/salmon/releases/download/v1.5.2/salmon-1.5.2_linux_x86_64.tar.gz \
+    | tar xz -C /opt \
+    && ln -s /opt/salmon-1.5.2_linux_x86_64/bin/salmon /usr/local/bin/salmon
+
 # Set the PATH environment variable (to /usr/bin)
+
+ENV PATH="/usr/bin:${PATH}"
 
