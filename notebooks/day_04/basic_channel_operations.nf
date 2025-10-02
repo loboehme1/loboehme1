@@ -6,7 +6,7 @@ workflow{
     // Task 1 - Extract the first item from the channel
 
     if (params.step == 1) {
-        in_ch = channel.of(1,2,3)
+        in_ch = channel.of(1,2,3).first()
 
     }
 
@@ -14,7 +14,7 @@ workflow{
     
     if (params.step == 2) {
 
-        in_ch = channel.of(1,2,3)
+        in_ch = channel.of(1,2,3).last()
 
     }
 
@@ -22,7 +22,7 @@ workflow{
 
     if (params.step == 3) {
 
-        in_ch = channel.of(1,2,3)
+        in_ch = channel.of(1,2,3).buffer(size: 2).first()
 
 
     }
@@ -31,7 +31,7 @@ workflow{
     
     if (params.step == 4) {
 
-        in_ch = channel.of(2,3,4)
+        in_ch = channel.of(2,3,4).flatMap { n -> n*n }
 
 
     }
@@ -40,8 +40,8 @@ workflow{
 
     if (params.step == 5) {
 
-        in_ch = channel.of(2,3,4)
-        in_ch.map { it -> it * it }.take(2).view()
+        in_ch = channel.of(2,3,4).flatMap { n -> n*n }.buffer(size: 2).first()
+        //in_ch.map { it -> it * it }.take(2).view()
         
     }
 
@@ -49,7 +49,8 @@ workflow{
 
     if (params.step == 6) {
         
-        in_ch = channel.of('Taylor', 'Swift')
+        list = channel.of('Taylor', 'Swift').collect()
+        in_ch = list.reverse().flatMap { it -> it }
 
     }
 
@@ -57,7 +58,8 @@ workflow{
 
     if (params.step == 7) {
 
-        in_ch = channel.fromPath('files_dir/*.fq')
+        path = channel.fromPath('files_dir/*.fq')
+        in_ch = path.map { file -> [file.getName(), file.toString()] }
 
         
     }
@@ -69,7 +71,7 @@ workflow{
         ch_1 = channel.of(1,2,3)
         ch_2 = channel.of(4,5,6)
         out_ch = channel.of("a", "b", "c")
-
+        in_ch = ch_1.mix(ch_2).mix(out_ch)
 
     }
 
@@ -77,7 +79,7 @@ workflow{
 
     if (params.step == 9) {
 
-        in_ch = channel.of([1,2,3], [4,5,6])
+        in_ch = channel.of([1,2,3], [4,5,6]).flatMap { it -> it }
 
 
     }
@@ -86,20 +88,21 @@ workflow{
 
     if (params.step == 10) {
 
-        in_ch = channel.of(1,2,3)
+        in_ch = channel.of(1,2,3).collect()
 
     }
     
 
 
-    // Task 11 -  From the input channel, create lists where each first item in the list of lists is the first item in the output channel, followed by a list of all the items its paired with
+    // Task 11 -  From the input channel, create lists where each first item in the list of lists 
+    // is the first item in the output channel, followed by a list of all the items its paired with
     // e.g. 
     // in: [[1, 'A'], [1, 'B'], [1, 'C'], [2, 'D'], [2, 'E'], [3, 'F']]
     // out: [[1, ['A', 'B', 'C']], [2, ['D', 'E']], [3, ['F']]]
 
     if (params.step == 11) {
 
-        in_ch = channel.of([1, 'V'], [3, 'M'], [2, 'O'], [1, 'f'], [3, 'G'], [1, 'B'], [2, 'L'], [2, 'E'], [3, '33'])
+        in_ch = channel.of([1, 'V'], [3, 'M'], [2, 'O'], [1, 'f'], [3, 'G'], [1, 'B'], [2, 'L'], [2, 'E'], [3, '33']).groupTuple().collect()
 
     }
 
@@ -108,18 +111,23 @@ workflow{
     if (params.step == 12) {
 
         left_ch = channel.of([1, 'V'], [3, 'M'], [2, 'O'], [1, 'B'], [3, '33'])
-        right_ch = channel.of([1, 'f'], [3, 'G'], [2, 'L'], [2, 'E'],)
+        right_ch = channel.of([1, 'f'], [3, 'G'], [2, 'L'], [2, 'E'])
+        in_ch = left_ch.join(right_ch)
 
     }
 
-    // Task 13 - Split the input channel into two channels, one of all the even numbers and the other of all the odd numbers. Write the output of each channel to a list
-    //           and write them to stdout including information which is which
+    // Task 13 - Split the input channel into two channels, one of all the even numbers and 
+    // the other of all the odd numbers. Write the output of each channel to a list and write 
+    // them to stdout including information which is which
 
     if (params.step == 13) {
 
         in_ch = channel.of(1,2,3,4,5,6,7,8,9,10)
-
+        even_ch = in_ch.filter { it % 2 == 0 }.collect().map { "Even numbers: ${it}" }.view()
+        odd_ch = in_ch.filter { it % 2 != 0 }.collect().map { "Odd numbers: ${it}" }.view()
     }
+
+
 
     // Task 14 - Nextflow has the concept of maps. Write the names in the maps in this channel to a file called "names.txt". Each name should be on a new line. 
     //           Store the file in the "results" directory under the name "names.txt"
@@ -135,8 +143,10 @@ workflow{
             ['name': 'Hagrid', 'title': 'groundkeeper'],
             ['name': 'Dobby', 'title': 'hero'],
         )
-    
+
+        targetFile = file('names.txt')
+        in_ch.map(it -> targetFile.append("${it.name}\n"))
     }
-
-
+    
+    //in_ch.view()
 }
