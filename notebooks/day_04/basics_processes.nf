@@ -95,10 +95,43 @@ process ZIP_FILE {
     """
 }
 
-process WRITETOFILE {
-    input:
+process ZIP_FILES {
+    debug true
 
+    input:
+    path file_to_zip
+
+    output:
+    path '*.zip'
+    path '*.gz'
+    path '*.bz2'
+
+    script:
+    """
+    zip ${file_to_zip}.zip ${file_to_zip}
+    gzip -c ${file_to_zip} > ${file_to_zip}.gz
+    bzip2 -c ${file_to_zip} > ${file_to_zip}.bz2
+    """
 }
+
+process WRITE_FILE {
+    input:
+    val records  // all maps in one list
+
+    output:
+    path "results/names.tsv"
+
+    script:
+    """
+    mkdir -p results
+    echo -e "name\ttitle" > results/names.tsv
+    ${records.collect { "echo -e '${it.name}\t${it.title}' >> results/names.tsv" }.join('\n')}
+    """
+}
+
+
+
+
 
 
 
@@ -155,25 +188,31 @@ workflow {
 
     if (params.step == 8) {
         greeting_ch = Channel.of("Hello world!")
+        a = UPPERCASE(greeting_ch)
+        def (zip_ch, gz_ch, bz2_ch) = ZIP_FILES(a)
+
+        zip_ch.map { it.toString() }.view { "ZIP: $it" }
+        gz_ch.map { it.toString() }.view { "GZ:  $it" }
+        bz2_ch.map { it.toString() }.view { "BZ2: $it" }
     }
 
     // Task 9 - Create a process that reads in a list of names and titles from a channel and writes them to a file.
     //          Store the file in the "results" directory under the name "names.tsv"
 
     if (params.step == 9) {
-        in_ch = channel.of(
+        in_ch = Channel.of(
             ['name': 'Harry', 'title': 'student'],
             ['name': 'Ron', 'title': 'student'],
             ['name': 'Hermione', 'title': 'student'],
             ['name': 'Albus', 'title': 'headmaster'],
             ['name': 'Snape', 'title': 'teacher'],
             ['name': 'Hagrid', 'title': 'groundkeeper'],
-            ['name': 'Dobby', 'title': 'hero'],
+            ['name': 'Dobby', 'title': 'hero']
         )
 
-        in_ch
-            | WRITETOFILE
-            // continue here
+        out_ch = in_ch.collect() | WRITE_FILE
+        out_ch.view { "Wrote file: $it" }
+
             
     }
 
