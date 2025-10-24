@@ -1,17 +1,17 @@
 # Fill out your Project Information
 
-Student1: \<name-1>
+Student1: Lorena Boehme
 
-Student2: \<name-2>
+Student2: Nils Waffenschmidt
 
-Project Github url: \<github-url> 
+Project Github url: git@github.com:loboehme1/Workflows_Project.git
 
 
 # Next steps
 
-1. Add us to the Project Github
+1. Add us to the Project Github - check
 2. Work together on the pipeline
-3. Commit+push your work frequently
+3. Commit+push your work frequently 
 4. Write your report and also upload your paper **in PDF format**
 
 

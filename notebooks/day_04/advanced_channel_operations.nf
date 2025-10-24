@@ -41,33 +41,38 @@ workflow{
 
     // Task 3 - Now we assume that we want to handle different "strandedness" values differently. 
     // Split the channel into the right amount of channels and write them all to stdout so that we can understand which is which.
-    if (params.step == 3) {
+    if( params.step == 3 ) {
 
-    def in_ch = Channel
+    samples = Channel
         .fromPath('../day_02/fetchngs-out/samplesheet/samplesheet.csv')
-        .splitCsv(header: true, sep: ',', quote: '"')
-        .filter { row -> row.fastq_1 && row.fastq_2 }
+        .splitCsv(header: true)
         .map { row ->
-            def meta  = row.findAll { k, v -> k != 'fastq_1' && k != 'fastq_2' }
-            def files = [ file(row.fastq_1), file(row.fastq_2) ]
-            [ meta, files ]
+            def sid = row.sample?.toString()?.trim()
+            def r1  = row.fastq_1?.toString()?.trim()
+            def r2  = row.fastq_2?.toString()?.trim()
+            def s   = row.strandedness?.toString()?.trim()
+            if( !sid ) error "CSV: missing 'sample' in row: ${row}"
+            if( !r1  ) error "CSV: missing 'fastq_1' for sample '${sid}'"
+            tuple(sid, r1, r2, s)
         }
 
-    // 🧠 Debug what .branch() receives
-    in_ch.map { pair ->
-        println "\n--- DEBUG ITEM ---"
-        println pair.getClass()
-        println pair.inspect()
-        return pair
+    // Branch by strandedness (case-insensitive), include 'auto'
+    def byStrand = samples.branch { sid, r1, r2, s ->
+        def st = (s ?: '').toLowerCase()
+        auto : !st || st in ['auto']                       // your sheet
+        fr   : st in ['fr','forward','fwd','sense','firststrand']
+        rf   : st in ['rf','reverse','rev','antisense','secondstrand']
+        none : st in ['none','unstranded','unstr','na']
+        _    : true
     }
-    .branch {
-        // for now just send everything to 'auto' so we can confirm it works
-        auto: true
-    }
-    .auto
-    .view()
-}
 
+    // Print each branch (use static wiring)
+    byStrand.auto.view { sid, r1, r2, s -> "auto\t${sid}\t${r1}\t${r2 ?: ''}\t(${s})" }
+    byStrand.fr.view   { sid, r1, r2, s -> "fr\t${sid}\t${r1}\t${r2 ?: ''}\t(${s})" }
+    byStrand.rf.view   { sid, r1, r2, s -> "rf\t${sid}\t${r1}\t${r2 ?: ''}\t(${s})" }
+    byStrand.none.view { sid, r1, r2, s -> "none\t${sid}\t${r1}\t${r2 ?: ''}\t(${s})" }
+    byStrand._.view    { sid, r1, r2, s -> "other\t${sid}\t${r1}\t${r2 ?: ''}\t(${s})" }
+}
 
 
 
