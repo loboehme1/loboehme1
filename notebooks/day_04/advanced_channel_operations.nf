@@ -41,47 +41,54 @@ workflow{
 
     // Task 3 - Now we assume that we want to handle different "strandedness" values differently. 
     // Split the channel into the right amount of channels and write them all to stdout so that we can understand which is which.
-    if( params.step == 3 ) {
-
-    samples = Channel
-        .fromPath('../day_02/fetchngs-out/samplesheet/samplesheet.csv')
-        .splitCsv(header: true)
-        .map { row ->
-            def sid = row.sample?.toString()?.trim()
-            def r1  = row.fastq_1?.toString()?.trim()
-            def r2  = row.fastq_2?.toString()?.trim()
-            def s   = row.strandedness?.toString()?.trim()
-            if( !sid ) error "CSV: missing 'sample' in row: ${row}"
-            if( !r1  ) error "CSV: missing 'fastq_1' for sample '${sid}'"
-            tuple(sid, r1, r2, s)
+    if (params.step == 3) {
+        in_ch = channel.fromPath('samplesheet.csv')
+            | splitCsv(header: true, sep: ',')
+            | map { row ->
+                def meta = [:]
+                def files = []
+                
+                // Extract metadata (everything except file paths)
+                meta.id = row.sample
+                meta.strandedness = row.strandedness
+                
+                // Extract file paths
+                files = [row.fastq_1, row.fastq_2]
+                
+                return [meta, files]
+            }
+        
+        // Branch based on strandedness
+        branched = in_ch.branch {
+            forward: it[0].strandedness == 'forward'
+            reverse: it[0].strandedness == 'reverse'
+            unstranded: it[0].strandedness == 'unstranded'
+            auto: it[0].strandedness == 'auto'
         }
-
-    // Branch by strandedness (case-insensitive), include 'auto'
-    def byStrand = samples.branch { sid, r1, r2, s ->
-        def st = (s ?: '').toLowerCase()
-        auto : !st || st in ['auto']                       // your sheet
-        fr   : st in ['fr','forward','fwd','sense','firststrand']
-        rf   : st in ['rf','reverse','rev','antisense','secondstrand']
-        none : st in ['none','unstranded','unstr','na']
-        _    : true
+        
+        // Display each branch with labels
+        branched.forward.view { "FORWARD: $it" }
+        branched.reverse.view { "REVERSE: $it" }
+        branched.unstranded.view { "UNSTRANDED: $it" }
+        branched.auto.view { "AUTO: $it" }
     }
-
-    // Print each branch (use static wiring)
-    byStrand.auto.view { sid, r1, r2, s -> "auto\t${sid}\t${r1}\t${r2 ?: ''}\t(${s})" }
-    byStrand.fr.view   { sid, r1, r2, s -> "fr\t${sid}\t${r1}\t${r2 ?: ''}\t(${s})" }
-    byStrand.rf.view   { sid, r1, r2, s -> "rf\t${sid}\t${r1}\t${r2 ?: ''}\t(${s})" }
-    byStrand.none.view { sid, r1, r2, s -> "none\t${sid}\t${r1}\t${r2 ?: ''}\t(${s})" }
-    byStrand._.view    { sid, r1, r2, s -> "other\t${sid}\t${r1}\t${r2 ?: ''}\t(${s})" }
-}
-
-
-
-
 
     // Task 4 - Group together all files with the same sample-id and strandedness value.
 
     if (params.step == 4) {
+        in_ch = channel.fromPath('samplesheet.csv')
+            | splitCsv(header: true, sep: ',')
+            | map { row ->
+                def meta = [id: row.sample, strandedness: row.strandedness]
+                def files = [row.fastq_1, row.fastq_2]
+                return [meta, files]
+            }
         
+        // Group by sample ID and strandedness combination
+        grouped = in_ch.groupTuple(by: [0])  // Group by the first element (meta map)
+        grouped.view { meta, filesList ->
+            "SAMPLE: ${meta.id}, STRANDEDNESS: ${meta.strandedness} -> FILES: ${filesList}"
+        }
     }
 
 
